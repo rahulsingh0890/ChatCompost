@@ -1,8 +1,6 @@
 # ChatCompost
 
-<div align="center">
-  <img src="icons/logo.png" alt="ChatCompost Logo" width="128" height="128">
-</div>
+<img src="icons/logo.png" alt="ChatCompost Logo" width="64" height="64">
 
 A Chrome extension that makes it easy to bulk delete ChatGPT conversations with checkboxes and a single click.
 

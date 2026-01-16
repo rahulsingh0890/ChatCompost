@@ -1,0 +1,100 @@
+/* ChatGPT Bulk Deleter Styles */
+
+/* Checkbox styling */
+.bulk-delete-checkbox {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #10a37f;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.bulk-delete-checkbox:hover {
+  transform: scale(1.1);
+}
+
+.bulk-delete-checkbox:checked {
+  accent-color: #10a37f;
+}
+
+/* Ensure the chat link is a flex container for proper alignment */
+nav a[href^="/c/"][data-bulk-delete-checkbox] {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Floating delete button container */
+#bulk-delete-floating-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Delete button styling */
+#bulk-delete-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s ease;
+}
+
+#bulk-delete-btn:hover:not(:disabled) {
+  background-color: #dc2626;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+  transform: translateY(-2px);
+}
+
+#bulk-delete-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+#bulk-delete-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Count badge styling */
+#bulk-delete-count {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* Dark mode adjustments (ChatGPT is typically dark) */
+@media (prefers-color-scheme: dark) {
+  .bulk-delete-checkbox {
+    accent-color: #10a37f;
+  }
+}

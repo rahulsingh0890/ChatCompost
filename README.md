@@ -35,7 +35,7 @@ ChatCompost adds checkboxes to each conversation in your ChatGPT sidebar, allowi
 
 ## Permissions
 
-This extension only requires the `activeTab` permission, which allows it to work on ChatGPT pages. It does not access any other websites or your browsing data.
+This extension only runs on ChatGPT pages (`chatgpt.com` and `chat.openai.com`). It uses the `activeTab` permission to access the current tab when you're on ChatGPT. The extension only makes API calls to ChatGPT's backend to delete conversations - it does not access any other websites or collect your browsing data.
 
 ## Version
 

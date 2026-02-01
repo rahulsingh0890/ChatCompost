@@ -1,6 +1,6 @@
-/* ChatGPT Bulk Deleter Styles */
+/* ChatCompost Styles - ChatGPT & Gemini Bulk Deleter */
 
-/* Checkbox styling */
+/* Checkbox styling - default (ChatGPT) */
 .bulk-delete-checkbox {
   width: 16px;
   height: 16px;
@@ -19,6 +19,15 @@
 
 .bulk-delete-checkbox:checked {
   accent-color: #10a37f;
+}
+
+/* Gemini-specific checkbox styling */
+.chatcompost-gemini .bulk-delete-checkbox {
+  accent-color: #4285f4; /* Google blue */
+}
+
+.chatcompost-gemini .bulk-delete-checkbox:checked {
+  accent-color: #4285f4;
 }
 
 /* Ensure the chat link is a flex container for proper alignment */
@@ -97,4 +106,40 @@ nav a[href^="/c/"][data-bulk-delete-checkbox] {
   .bulk-delete-checkbox {
     accent-color: #10a37f;
   }
+
+  /* Gemini dark mode */
+  .chatcompost-gemini .bulk-delete-checkbox {
+    accent-color: #8ab4f8; /* Google light blue for dark mode */
+  }
+
+  .chatcompost-gemini .bulk-delete-checkbox:checked {
+    accent-color: #8ab4f8;
+  }
+}
+
+/* Gemini conversation item styling */
+.chatcompost-gemini div[data-test-id="conversation"] {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.chatcompost-gemini a.conversation-item {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Ensure Gemini sidebar items have proper flex layout */
+.chatcompost-gemini [role="navigation"] a,
+.chatcompost-gemini side-navigation a,
+.chatcompost-gemini side-navigation-v2 a {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Ensure checkbox is visible in Gemini */
+.chatcompost-gemini .bulk-delete-checkbox {
+  position: relative;
+  z-index: 100;
+  margin-right: 8px;
+  flex-shrink: 0;
 }

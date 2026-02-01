@@ -2,11 +2,11 @@
 
 <img src="icons/logo.png" alt="ChatCompost Logo" width="64" height="64">
 
-A Chrome extension that makes it easy to bulk delete ChatGPT conversations with checkboxes and a single click.
+A Chrome extension that makes it easy to bulk delete **ChatGPT** and **Google Gemini** conversations with checkboxes and a single click.
 
 ## What it does
 
-ChatCompost adds checkboxes to each conversation in your ChatGPT sidebar, allowing you to select multiple conversations and delete them all at once. No more clicking through each conversation individually!
+ChatCompost adds checkboxes to each conversation in your ChatGPT or Gemini sidebar, allowing you to select multiple conversations and delete them all at once. No more clicking through each conversation individually!
 
 ## Installation
 
@@ -18,7 +18,7 @@ ChatCompost adds checkboxes to each conversation in your ChatGPT sidebar, allowi
 
 ## How to use
 
-1. Navigate to [chatgpt.com](https://chatgpt.com) and open your conversation sidebar
+1. Navigate to [chatgpt.com](https://chatgpt.com) or [gemini.google.com](https://gemini.google.com) and open your conversation sidebar
 2. You'll see checkboxes appear next to each conversation
 3. Select the conversations you want to delete by checking their boxes
 4. A floating "Delete Selected" button will appear at the bottom of the page showing the count of selected conversations
@@ -27,17 +27,29 @@ ChatCompost adds checkboxes to each conversation in your ChatGPT sidebar, allowi
 
 ## Features
 
+- ✅ Works on both **ChatGPT** and **Google Gemini**
 - ✅ Checkbox selection for multiple conversations
 - ✅ Visual count of selected conversations
 - ✅ Bulk delete with a single click
 - ✅ Confirmation dialog to prevent accidental deletions
 - ✅ Automatic page refresh after deletion to show updated list
+- ✅ Platform-specific styling (green for ChatGPT, blue for Gemini)
+
+## Supported Platforms
+
+| Platform | URL | Deletion Method |
+|----------|-----|-----------------|
+| ChatGPT | chatgpt.com, chat.openai.com | API |
+| Google Gemini | gemini.google.com | UI Automation |
 
 ## Permissions
 
-This extension only runs on ChatGPT pages (`chatgpt.com` and `chat.openai.com`). It uses the `activeTab` permission to access the current tab when you're on ChatGPT. The extension only makes API calls to ChatGPT's backend to delete conversations - it does not access any other websites or collect your browsing data.
+This extension only runs on ChatGPT and Gemini pages. It uses content scripts that automatically run when you visit these pages. The extension does not access any other websites or collect your browsing data.
+
+- **ChatGPT**: Uses API calls to delete conversations
+- **Gemini**: Uses UI automation (clicking menu buttons) since Gemini has no public deletion API
 
 ## Version
 
-Current version: 1.0.1
+Current version: 1.1.0
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ChatCompost",
-  "version": "1.0.1",
-  "description": "Bulk delete ChatGPT conversations with checkboxes and a single click",
+  "version": "1.1.0",
+  "description": "Bulk delete ChatGPT and Gemini conversations with checkboxes and a single click",
   "permissions": ["activeTab"],
   "icons": {
     "16": "icons/logo.png",
@@ -11,7 +11,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://chatgpt.com/c/*", "https://chatgpt.com/g/*"],
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://chatgpt.com/c/*", "https://chatgpt.com/g/*", "https://*.gemini.google.com/*", "https://gemini.google.com/*"],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"

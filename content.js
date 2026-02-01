@@ -408,8 +408,49 @@
     return items;
   }
 
+  // Check if element is a real conversation (not New chat, My Stuff, Gems, etc.)
+  function isActualConversation(element) {
+    const text = element.textContent?.trim().toLowerCase() || '';
+
+    // List of non-conversation items to exclude
+    const excludeTexts = [
+      'new chat',
+      'my stuff',
+      'gems',
+      'settings',
+      'help',
+      'updates',
+      'activity'
+    ];
+
+    // Check if text matches any excluded item
+    for (const exclude of excludeTexts) {
+      if (text === exclude || text.startsWith(exclude + ' ')) {
+        return false;
+      }
+    }
+
+    // Also exclude if it has chevron/arrow indicating a menu section (not a chat)
+    // These typically have very short text
+    if (text.length < 3) {
+      return false;
+    }
+
+    return true;
+  }
+
   // Create and inject a checkbox for a chat item
   function injectCheckbox(chatLink) {
+    // Skip non-conversation items (Gemini)
+    if (PLATFORM === 'gemini' && !isActualConversation(chatLink)) {
+      // Remove checkbox if it was previously added
+      const existingCheckbox = chatLink.querySelector('.bulk-delete-checkbox');
+      if (existingCheckbox) {
+        existingCheckbox.remove();
+      }
+      return null;
+    }
+
     let checkbox = chatLink.querySelector('.bulk-delete-checkbox');
     const identifier = getChatIdentifier(chatLink);
 
@@ -493,10 +534,16 @@
 
     const chatItems = findChatItems();
 
-    // Inject checkboxes
+    // Inject checkboxes (only for actual conversations)
+    let injectedCount = 0;
     chatItems.forEach((chatLink) => {
-      injectCheckbox(chatLink);
+      const checkbox = injectCheckbox(chatLink);
+      if (checkbox) injectedCount++;
     });
+
+    if (PLATFORM === 'gemini') {
+      console.log(`[ChatCompost] Injected ${injectedCount} checkboxes (filtered from ${chatItems.length} items)`);
+    }
 
     // Update button after all checkboxes are processed
     updateFloatingButton();

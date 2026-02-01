@@ -33,7 +33,6 @@ ChatCompost adds checkboxes to each conversation in your ChatGPT or Gemini sideb
 - ✅ Bulk delete with a single click
 - ✅ Confirmation dialog to prevent accidental deletions
 - ✅ Automatic page refresh after deletion to show updated list
-- ✅ Platform-specific styling (green for ChatGPT, blue for Gemini)
 
 ## Supported Platforms
 

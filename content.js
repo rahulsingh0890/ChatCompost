@@ -1,80 +1,27 @@
 (function () {
   'use strict';
 
-  // Platform detection
-  const PLATFORM = (function detectPlatform() {
-    const host = window.location.hostname;
-    if (host.includes('chatgpt.com') || host.includes('chat.openai.com')) {
-      return 'chatgpt';
-    }
-    if (host.includes('gemini.google.com')) {
-      return 'gemini';
-    }
-    return null;
-  })();
+  const host = window.location.hostname;
+  if (host !== 'chatgpt.com' && host !== 'chat.openai.com') return;
 
-  // Exit if unsupported platform
-  if (!PLATFORM) {
-    console.log('[ChatCompost] Unsupported platform, exiting');
-    return;
-  }
-
-  // Platform-specific configurations
-  const PLATFORMS = {
-    chatgpt: {
-      chatItemSelector: 'nav a[href^="/c/"]',
-      storageKey: 'chatcompost_chatgpt_checked',
-      accentColor: '#10a37f',  // OpenAI green
-      extractId: (el) => {
-        const href = el.getAttribute('href');
-        return href && href.startsWith('/c/') ? href.substring(3) : null;
-      },
-      deleteMethod: 'api'
-    },
-    gemini: {
-      // Multiple selectors to try - Gemini's DOM varies
-      chatItemSelectors: [
-        'div[data-test-id="conversation"]',
-        '.conversation-item',
-        'a[href*="/app/"][href*="c/"]',
-        'side-navigation-v2 a',
-        'side-navigation a'
-      ],
-      chatItemSelector: 'div[data-test-id="conversation"], .conversation-item, a[href*="/app/"]',
-      storageKey: 'chatcompost_gemini_checked',
-      accentColor: '#4285f4',  // Google blue
-      extractId: (el) => {
-        // Try href first
-        const href = el.getAttribute('href') || el.querySelector('a')?.getAttribute('href');
-        if (href) {
-          const match = href.match(/\/app\/([^/?]+)/);
-          if (match) return match[1];
-        }
-        // Try data attributes
-        const testId = el.getAttribute('data-test-id');
-        if (testId && testId !== 'conversation') return testId;
-        // Fallback to text content hash
-        return el.textContent?.trim().substring(0, 50);
-      },
-      deleteMethod: 'ui'
+  const config = {
+    chatItemSelector: 'nav a[href^="/c/"]',
+    storageKey: 'chatcompost_chatgpt_checked',
+    extractId: (el) => {
+      const href = el.getAttribute('href');
+      return href && href.startsWith('/c/') ? href.substring(3) : null;
     }
   };
-
-  const config = PLATFORMS[PLATFORM];
 
   let floatingButton = null;
   let isDeleting = false;
   let accessToken = null;
   let isRestoringState = false; // Flag to prevent saving state during restoration
 
-  console.log(`[ChatCompost] Extension loaded on ${PLATFORM}`);
+  console.log('[ChatCompost] Extension loaded on ChatGPT');
 
-  // Add platform class to body for CSS targeting
-  document.body.classList.add(`chatcompost-${PLATFORM}`);
-
-  // Get access token from ChatGPT session (ChatGPT only)
+  // Get access token from the ChatGPT session
   async function getAccessToken() {
-    if (PLATFORM !== 'chatgpt') return null;
     if (accessToken) return accessToken;
 
     try {
@@ -97,188 +44,26 @@
     }
   }
 
-  // Wait for element to appear in DOM (for Gemini UI automation)
-  async function waitForElement(selector, timeout = 3000) {
-    return new Promise((resolve, reject) => {
-      const el = document.querySelector(selector);
-      if (el) return resolve(el);
+  // Delete a conversation via the ChatGPT API.
+  async function deleteConversation(conversationId) {
+    const token = await getAccessToken();
 
-      const observer = new MutationObserver(() => {
-        const found = document.querySelector(selector);
-        if (found) {
-          observer.disconnect();
-          resolve(found);
-        }
-      });
-
-      observer.observe(document.body, { childList: true, subtree: true });
-      setTimeout(() => {
-        observer.disconnect();
-        reject(new Error(`Timeout waiting for: ${selector}`));
-      }, timeout);
+    const response = await fetch(`https://chatgpt.com/backend-api/conversation/${conversationId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+      body: JSON.stringify({ is_visible: false })
     });
-  }
 
-  // Find element by text content
-  function findElementByText(selector, text) {
-    const elements = document.querySelectorAll(selector);
-    for (const el of elements) {
-      if (el.textContent.toLowerCase().includes(text.toLowerCase())) {
-        return el;
-      }
+    if (!response.ok) {
+      throw new Error(`Delete failed: ${response.status}`);
     }
-    return null;
-  }
 
-  // Wait for element in overlay container (for Gemini menus/dialogs)
-  function waitForOverlayElement(selector, timeout = 5000) {
-    return new Promise((resolve, reject) => {
-      const overlayDiv = document.querySelector('div.cdk-overlay-container');
-      if (!overlayDiv) {
-        return reject(new Error('Overlay container not found'));
-      }
-
-      // Check if element already exists
-      const existing = overlayDiv.querySelector(selector);
-      if (existing) {
-        return resolve(existing);
-      }
-
-      const observer = new MutationObserver(() => {
-        const el = overlayDiv.querySelector(selector);
-        if (el) {
-          observer.disconnect();
-          resolve(el);
-        }
-      });
-
-      observer.observe(overlayDiv, { subtree: true, childList: true });
-
-      setTimeout(() => {
-        observer.disconnect();
-        reject(new Error(`Timeout waiting for overlay element: ${selector}`));
-      }, timeout);
-    });
-  }
-
-  // Wait for element to disappear
-  function waitForElementToDisappear(selector, timeout = 5000) {
-    return new Promise((resolve) => {
-      const check = () => {
-        const el = document.querySelector(selector);
-        if (!el) {
-          resolve();
-          return;
-        }
-        setTimeout(check, 100);
-      };
-      check();
-      setTimeout(resolve, timeout); // Resolve anyway after timeout
-    });
-  }
-
-  // Delete via UI automation (for Gemini)
-  async function deleteViaUI(chatElement) {
-    try {
-      // 1. Hover to reveal menu button
-      chatElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-      await new Promise(r => setTimeout(r, 300));
-
-      // 2. Find the three-dot actions button
-      // The structure is: checkbox is in conversation div, actions button is in sibling element
-      // Try to find button in next sibling first (based on working extension pattern)
-      let actionsBtn = null;
-
-      // Method 1: Look in next sibling element
-      if (chatElement.nextElementSibling) {
-        actionsBtn = chatElement.nextElementSibling.querySelector('button');
-      }
-
-      // Method 2: Look within the element itself
-      if (!actionsBtn) {
-        const buttons = chatElement.querySelectorAll('button');
-        for (const btn of buttons) {
-          // Skip if it's a known non-menu button
-          if (btn.closest('.bulk-delete-checkbox')) continue;
-          actionsBtn = btn;
-          break;
-        }
-      }
-
-      // Method 3: Look in parent's children for actions container
-      if (!actionsBtn && chatElement.parentElement) {
-        const siblings = chatElement.parentElement.children;
-        for (const sibling of siblings) {
-          if (sibling !== chatElement) {
-            const btn = sibling.querySelector('button');
-            if (btn) {
-              actionsBtn = btn;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!actionsBtn) {
-        throw new Error('Actions menu button not found');
-      }
-
-      console.log('[ChatCompost] Clicking actions button...');
-      actionsBtn.click();
-
-      // 3. Wait for delete button to appear in overlay
-      console.log('[ChatCompost] Waiting for delete button in overlay...');
-      const deleteBtn = await waitForOverlayElement('button[data-test-id="delete-button"]');
-
-      await new Promise(r => setTimeout(r, 200));
-      console.log('[ChatCompost] Clicking delete button...');
-      deleteBtn.click();
-
-      // 4. Wait for confirm button to appear
-      console.log('[ChatCompost] Waiting for confirm button...');
-      const confirmBtn = await waitForOverlayElement('button[data-test-id="confirm-button"]');
-
-      await new Promise(r => setTimeout(r, 200));
-      console.log('[ChatCompost] Clicking confirm button...');
-      confirmBtn.click();
-
-      // 5. Wait for confirmation to complete
-      await new Promise(r => setTimeout(r, 500));
-      console.log('[ChatCompost] Delete completed');
-
-      return { success: true };
-    } catch (error) {
-      console.error('[ChatCompost] UI automation error:', error);
-      throw error;
-    }
-  }
-
-  // Delete a conversation via API (ChatGPT) or UI (Gemini)
-  async function deleteConversation(conversationId, chatElement) {
-    if (config.deleteMethod === 'api') {
-      // ChatGPT API deletion
-      const token = await getAccessToken();
-
-      const response = await fetch(`https://chatgpt.com/backend-api/conversation/${conversationId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({ is_visible: false })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result.success;
-    } else {
-      // Gemini UI automation
-      return await deleteViaUI(chatElement);
-    }
+    const result = await response.json();
+    return result.success;
   }
 
   // Extract conversation ID from element
@@ -303,8 +88,7 @@
 
     const checkedIds = [];
     document.querySelectorAll('.bulk-delete-checkbox:checked').forEach((checkbox) => {
-      const chatLink = checkbox.closest(config.chatItemSelector.split(',')[0].trim()) ||
-                       checkbox.closest('a');
+      const chatLink = checkbox.closest(config.chatItemSelector);
       if (chatLink) {
         const id = getChatIdentifier(chatLink);
         if (id) {
@@ -364,91 +148,13 @@
     }
   }
 
-  // Find all chat conversation links in the sidebar
+  // Find all chat conversation links in the sidebar.
   function findChatItems() {
-    let items = document.querySelectorAll(config.chatItemSelector);
-
-    // For Gemini, try multiple selectors if the main one fails
-    if (PLATFORM === 'gemini' && items.length === 0 && config.chatItemSelectors) {
-      for (const selector of config.chatItemSelectors) {
-        items = document.querySelectorAll(selector);
-        if (items.length > 0) {
-          console.log(`[ChatCompost] Found ${items.length} items with selector: ${selector}`);
-          break;
-        }
-      }
-    }
-
-    // Debug: log what we found
-    if (items.length === 0) {
-      console.log('[ChatCompost] No chat items found. Trying to detect sidebar structure...');
-      // Log some potential containers to help debug
-      const potentialContainers = [
-        'side-navigation', 'side-navigation-v2', '[role="navigation"]',
-        'nav', '.sidebar', '[class*="sidebar"]', '[class*="conversation"]'
-      ];
-      potentialContainers.forEach(sel => {
-        const el = document.querySelector(sel);
-        if (el) {
-          console.log(`[ChatCompost] Found container: ${sel}`, el.tagName, el.className);
-          // Log first few children
-          const children = el.querySelectorAll('a, div[class*="conversation"], li');
-          console.log(`[ChatCompost]   Children (a, div, li): ${children.length}`);
-          if (children.length > 0 && children.length < 10) {
-            children.forEach((c, i) => console.log(`[ChatCompost]   Child ${i}:`, c.tagName, c.className, c.getAttribute('href')?.substring(0, 50)));
-          }
-        }
-      });
-    } else {
-      console.log(`[ChatCompost] Found ${items.length} chat items`);
-    }
-
-    return items;
+    return document.querySelectorAll(config.chatItemSelector);
   }
 
-  // Check if element is a real conversation (not New chat, My Stuff, Gems, etc.)
-  function isActualConversation(element) {
-    const text = element.textContent?.trim().toLowerCase() || '';
-
-    // List of non-conversation items to exclude
-    const excludeTexts = [
-      'new chat',
-      'my stuff',
-      'gems',
-      'settings',
-      'help',
-      'updates',
-      'activity'
-    ];
-
-    // Check if text matches any excluded item
-    for (const exclude of excludeTexts) {
-      if (text === exclude || text.startsWith(exclude + ' ')) {
-        return false;
-      }
-    }
-
-    // Also exclude if it has chevron/arrow indicating a menu section (not a chat)
-    // These typically have very short text
-    if (text.length < 3) {
-      return false;
-    }
-
-    return true;
-  }
-
-  // Create and inject a checkbox for a chat item
+  // Create and inject a checkbox for a chat item.
   function injectCheckbox(chatLink) {
-    // Skip non-conversation items (Gemini)
-    if (PLATFORM === 'gemini' && !isActualConversation(chatLink)) {
-      // Remove checkbox if it was previously added
-      const existingCheckbox = chatLink.querySelector('.bulk-delete-checkbox');
-      if (existingCheckbox) {
-        existingCheckbox.remove();
-      }
-      return null;
-    }
-
     let checkbox = chatLink.querySelector('.bulk-delete-checkbox');
     const identifier = getChatIdentifier(chatLink);
 
@@ -491,17 +197,12 @@
         }
       });
 
-      if (PLATFORM === 'chatgpt') {
-        // Keep the checkbox out of the app's flex/grid layout. Pinned rows can
-        // distribute their children across the full width of the sidebar.
-        if (!chatLink.hasAttribute('data-bulk-delete-checkbox')) {
-          const padding = getComputedStyle(chatLink).paddingInlineStart || '0px';
-          chatLink.style.setProperty('--chatcompost-original-padding', padding);
-          chatLink.setAttribute('data-bulk-delete-checkbox', '');
-        }
-      } else {
-        chatLink.style.display = 'flex';
-        chatLink.style.alignItems = 'center';
+      // Keep the checkbox out of the app's flex/grid layout. Pinned rows can
+      // distribute their children across the full width of the sidebar.
+      if (!chatLink.hasAttribute('data-bulk-delete-checkbox')) {
+        const padding = getComputedStyle(chatLink).paddingInlineStart || '0px';
+        chatLink.style.setProperty('--chatcompost-original-padding', padding);
+        chatLink.setAttribute('data-bulk-delete-checkbox', '');
       }
       chatLink.insertBefore(checkbox, chatLink.firstChild);
     } else {
@@ -518,16 +219,7 @@
 
     const chatItems = findChatItems();
 
-    // Inject checkboxes (only for actual conversations)
-    let injectedCount = 0;
-    chatItems.forEach((chatLink) => {
-      const checkbox = injectCheckbox(chatLink);
-      if (checkbox) injectedCount++;
-    });
-
-    if (PLATFORM === 'gemini') {
-      console.log(`[ChatCompost] Injected ${injectedCount} checkboxes (filtered from ${chatItems.length} items)`);
-    }
+    chatItems.forEach(injectCheckbox);
 
     // Update button after all checkboxes are processed
     updateFloatingButton();
@@ -538,7 +230,7 @@
   function getSelectedChats() {
     const checkboxes = document.querySelectorAll('.bulk-delete-checkbox:checked');
     return Array.from(checkboxes).map((cb) => {
-      return cb.closest(config.chatItemSelector.split(',')[0].trim()) || cb.closest('a');
+      return cb.closest(config.chatItemSelector);
     }).filter(Boolean);
   }
 
@@ -575,12 +267,10 @@
     const selectedChats = getSelectedChats();
     if (selectedChats.length === 0) return;
 
-    const platformName = PLATFORM === 'chatgpt' ? 'ChatGPT' : 'Gemini';
-    if (!confirm(`Delete ${selectedChats.length} ${platformName} conversation(s)? This cannot be undone.`)) return;
+    if (!confirm(`Delete ${selectedChats.length} ChatGPT conversation(s)? This cannot be undone.`)) return;
 
     isDeleting = true;
     const btn = document.getElementById('bulk-delete-btn');
-    const originalText = btn.innerHTML;
     btn.disabled = true;
 
     let successCount = 0;
@@ -590,7 +280,7 @@
       const chatLink = selectedChats[i];
       const conversationId = getConversationId(chatLink);
 
-      if (!conversationId && config.deleteMethod === 'api') {
+      if (!conversationId) {
         console.log(`[ChatCompost] Could not get conversation ID for chat ${i + 1}`);
         failCount++;
         continue;
@@ -599,8 +289,8 @@
       btn.textContent = `Deleting ${i + 1}/${selectedChats.length}...`;
 
       try {
-        await deleteConversation(conversationId, chatLink);
-        console.log(`[ChatCompost] Deleted conversation: ${conversationId || 'via UI'}`);
+        await deleteConversation(conversationId);
+        console.log(`[ChatCompost] Deleted conversation: ${conversationId}`);
         successCount++;
 
         // Mark as deleted visually
@@ -619,9 +309,8 @@
         failCount++;
       }
 
-      // Delay between deletions (longer for UI automation)
-      const delay = config.deleteMethod === 'ui' ? 800 : 300;
-      await new Promise(r => setTimeout(r, delay));
+      // Delay between deletions.
+      await new Promise(r => setTimeout(r, 300));
     }
 
     console.log(`[ChatCompost] Done. Success: ${successCount}, Failed: ${failCount}`);
@@ -647,9 +336,7 @@
       attributes: true,
       attributeFilter: ['href']
     };
-    const itemSelector = PLATFORM === 'gemini'
-      ? [config.chatItemSelector, ...config.chatItemSelectors].join(', ')
-      : config.chatItemSelector;
+    const itemSelector = config.chatItemSelector;
 
     function containsChat(node) {
       return node.nodeType === Node.ELEMENT_NODE && (
@@ -692,32 +379,12 @@
   }
 
   function init() {
-    // Gemini's SPA might take longer to load
-    const initialDelay = PLATFORM === 'gemini' ? 2500 : 1500;
-
     setTimeout(() => {
-      console.log(`[ChatCompost] Initializing on ${PLATFORM}...`);
+      console.log('[ChatCompost] Initializing on ChatGPT...');
 
       injectAllCheckboxes();
       createFloatingButton();
       setupObserver();
-
-      // For Gemini, retry injection a few times since content loads dynamically
-      if (PLATFORM === 'gemini') {
-        let retryCount = 0;
-        const retryInterval = setInterval(() => {
-          const items = findChatItems();
-          if (items.length === 0 && retryCount < 5) {
-            console.log(`[ChatCompost] Retry ${retryCount + 1}: Looking for chat items...`);
-            retryCount++;
-          } else {
-            if (items.length > 0) {
-              injectAllCheckboxes();
-            }
-            clearInterval(retryInterval);
-          }
-        }, 2000);
-      }
 
       // Save state before page unloads
       window.addEventListener('beforeunload', () => {
@@ -736,8 +403,8 @@
         saveCheckedState();
       }, 2000);
 
-      console.log(`[ChatCompost] Initialized on ${PLATFORM}`);
-    }, initialDelay);
+      console.log('[ChatCompost] Initialized on ChatGPT');
+    }, 1500);
   }
 
   if (document.readyState === 'loading') {

@@ -44,7 +44,7 @@ async function fixture(t, html, hostname = 'chatgpt.com') {
 
   await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
   window.eval(script);
-  await tick(hostname === 'chatgpt.com' ? 1500 : 2500);
+  await tick(1500);
   return { window, document, tick };
 }
 
@@ -131,12 +131,22 @@ test('restores a checkbox removed by the app and saves immediate selection chang
   assert.deepEqual(JSON.parse(window.sessionStorage.getItem('chatcompost_chatgpt_checked')), []);
 });
 
-test('Gemini still adds checkboxes to dynamically loaded conversations', async (t) => {
-  const { document, tick } = await fixture(t,
-    '<div data-test-id="conversation">Existing conversation</div>', 'gemini.google.com');
-  document.body.insertAdjacentHTML('beforeend', '<div data-test-id="conversation">Later conversation</div>');
-  await tick(151);
-  assert.equal(document.querySelectorAll('.bulk-delete-checkbox').length, 2);
+test('does not activate on unsupported sites', async (t) => {
+  const { document, tick } = await fixture(t, `<nav>${row('chat')}</nav>`, 'gemini.google.com');
+  await tick(3000);
+  assert.equal(document.querySelectorAll('.bulk-delete-checkbox').length, 0);
+  assert.equal(document.querySelector('#bulk-delete-floating-btn'), null);
+  const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
+  for (const entry of manifest.content_scripts) {
+    for (const match of entry.matches) {
+      assert.ok(['chatgpt.com', 'chat.openai.com'].includes(new URL(match).hostname));
+    }
+  }
+});
+
+test('still supports the legacy ChatGPT hostname', async (t) => {
+  const { document } = await fixture(t, `<nav>${row('legacy')}</nav>`, 'chat.openai.com');
+  assert.ok(box(document, 'legacy'));
 });
 
 test('preserves pinned row layout and does not accumulate padding on reinjection', async (t) => {

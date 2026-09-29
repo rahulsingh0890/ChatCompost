@@ -30,10 +30,22 @@
   accent-color: #4285f4;
 }
 
-/* Ensure the chat link is a flex container for proper alignment */
+/* Reserve a checkbox gutter without changing the app's pinned/recent layout. */
 nav a[href^="/c/"][data-bulk-delete-checkbox] {
-  display: flex !important;
-  align-items: center !important;
+  position: relative;
+  padding-inline-start: calc(var(--chatcompost-original-padding, 0px) + 24px) !important;
+}
+
+nav a[href^="/c/"][data-bulk-delete-checkbox] > .bulk-delete-checkbox {
+  position: absolute;
+  inset-inline-start: var(--chatcompost-original-padding, 0px);
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+nav a[href^="/c/"][data-bulk-delete-checkbox] > .bulk-delete-checkbox:hover {
+  transform: translateY(-50%) scale(1.1);
 }
 
 /* Floating delete button container */

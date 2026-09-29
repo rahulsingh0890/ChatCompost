@@ -22,7 +22,6 @@
   // Platform-specific configurations
   const PLATFORMS = {
     chatgpt: {
-      sidebarSelector: 'nav',
       chatItemSelector: 'nav a[href^="/c/"]',
       storageKey: 'chatcompost_chatgpt_checked',
       accentColor: '#10a37f',  // OpenAI green
@@ -33,7 +32,6 @@
       deleteMethod: 'api'
     },
     gemini: {
-      sidebarSelector: 'body',  // Observe entire body for Gemini
       // Multiple selectors to try - Gemini's DOM varies
       chatItemSelectors: [
         'div[data-test-id="conversation"]',
@@ -493,18 +491,22 @@
         }
       });
 
-      chatLink.style.display = 'flex';
-      chatLink.style.alignItems = 'center';
+      if (PLATFORM === 'chatgpt') {
+        // Keep the checkbox out of the app's flex/grid layout. Pinned rows can
+        // distribute their children across the full width of the sidebar.
+        if (!chatLink.hasAttribute('data-bulk-delete-checkbox')) {
+          const padding = getComputedStyle(chatLink).paddingInlineStart || '0px';
+          chatLink.style.setProperty('--chatcompost-original-padding', padding);
+          chatLink.setAttribute('data-bulk-delete-checkbox', '');
+        }
+      } else {
+        chatLink.style.display = 'flex';
+        chatLink.style.alignItems = 'center';
+      }
       chatLink.insertBefore(checkbox, chatLink.firstChild);
     } else {
-      // Checkbox already exists - restore its state if needed
-      if (shouldBeChecked && !checkbox.checked) {
-        isRestoringState = true;
-        checkbox.checked = true;
-        setTimeout(() => {
-          isRestoringState = false;
-        }, 10);
-      }
+      // A sidebar row can be reused for a different conversation.
+      checkbox.checked = shouldBeChecked;
     }
 
     return checkbox;
@@ -513,24 +515,6 @@
   function injectAllCheckboxes() {
     // Set flag to prevent saving during restoration
     isRestoringState = true;
-
-    // Save current state BEFORE we start modifying checkboxes
-    const currentChecked = [];
-    document.querySelectorAll('.bulk-delete-checkbox:checked').forEach((checkbox) => {
-      const chatLink = checkbox.closest(config.chatItemSelector.split(',')[0].trim()) ||
-                       checkbox.closest('a');
-      if (chatLink) {
-        const id = getChatIdentifier(chatLink);
-        if (id) {
-          currentChecked.push(id);
-        }
-      }
-    });
-
-    // Save current state if we have checked items
-    if (currentChecked.length > 0) {
-      sessionStorage.setItem(config.storageKey, JSON.stringify(currentChecked));
-    }
 
     const chatItems = findChatItems();
 
@@ -548,10 +532,7 @@
     // Update button after all checkboxes are processed
     updateFloatingButton();
 
-    // Clear flag after a short delay
-    setTimeout(() => {
-      isRestoringState = false;
-    }, 100);
+    isRestoringState = false;
   }
 
   function getSelectedChats() {
@@ -660,78 +641,54 @@
 
   function setupObserver() {
     let timeoutId = null;
-    let isRestoring = false;
+    const options = {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href']
+    };
+    const itemSelector = PLATFORM === 'gemini'
+      ? [config.chatItemSelector, ...config.chatItemSelectors].join(', ')
+      : config.chatItemSelector;
 
-    const observer = new MutationObserver(() => {
-      if (isRestoring) return;
+    function containsChat(node) {
+      return node.nodeType === Node.ELEMENT_NODE && (
+        node.matches(itemSelector) ||
+        node.querySelector(itemSelector) ||
+        node.matches('.bulk-delete-checkbox') ||
+        node.querySelector('.bulk-delete-checkbox')
+      );
+    }
 
-      clearTimeout(timeoutId);
+    const observer = new MutationObserver((mutations) => {
+      const chatsChanged = mutations.some((mutation) => {
+        const target = mutation.target;
+        if (target.nodeType === Node.ELEMENT_NODE && (
+          target.closest(itemSelector) || containsChat(target)
+        )) return true;
+
+        return [...mutation.addedNodes, ...mutation.removedNodes].some(containsChat);
+      });
+      if (!chatsChanged || timeoutId !== null) return;
+
+      // Batch updates without postponing them indefinitely while the page changes.
       timeoutId = setTimeout(() => {
-        isRestoring = true;
-        injectAllCheckboxes();
-
-        // Retry restoration after a delay
-        setTimeout(() => {
-          const saved = sessionStorage.getItem(config.storageKey);
-          if (saved) {
-            try {
-              const checkedIds = JSON.parse(saved);
-              if (checkedIds.length > 0) {
-                const chatItems = findChatItems();
-                let anyChecked = false;
-                chatItems.forEach((chatLink) => {
-                  const checkbox = chatLink.querySelector('.bulk-delete-checkbox');
-                  if (checkbox && checkbox.checked) {
-                    anyChecked = true;
-                  }
-                });
-
-                if (!anyChecked) {
-                  chatItems.forEach((chatLink) => {
-                    const identifier = getChatIdentifier(chatLink);
-                    if (checkedIds.includes(identifier)) {
-                      const checkbox = chatLink.querySelector('.bulk-delete-checkbox');
-                      if (checkbox && !checkbox.checked) {
-                        isRestoringState = true;
-                        checkbox.checked = true;
-                      }
-                    }
-                  });
-                  updateFloatingButton();
-                  setTimeout(() => {
-                    isRestoringState = false;
-                  }, 50);
-                }
-              }
-            } catch (e) {
-              // Ignore
-            }
-          }
-        }, 300);
-
-        setTimeout(() => {
-          isRestoring = false;
-        }, 500);
+        timeoutId = null;
+        // Ignore only our own synchronous DOM writes. Resume immediately so
+        // newly loaded chats never fall into a timed observation blind spot.
+        observer.disconnect();
+        try {
+          injectAllCheckboxes();
+        } finally {
+          isRestoringState = false;
+          observer.observe(document.body, options);
+        }
       }, 150);
     });
 
-    // Try to find sidebar using platform-specific selectors
-    const sidebarSelectors = config.sidebarSelector.split(',').map(s => s.trim());
-    let sidebar = null;
-
-    for (const selector of sidebarSelectors) {
-      sidebar = document.querySelector(selector);
-      if (sidebar) break;
-    }
-
-    if (sidebar) {
-      observer.observe(sidebar, { childList: true, subtree: true });
-      console.log(`[ChatCompost] Observing sidebar`);
-    } else {
-      // Fallback: observe body if sidebar not found
-      observer.observe(document.body, { childList: true, subtree: true });
-      console.log(`[ChatCompost] Sidebar not found, observing body`);
-    }
+    // The app can have several navigation sections and replace the entire
+    // sidebar during navigation. Observe a stable ancestor of all of them.
+    observer.observe(document.body, options);
   }
 
   function init() {

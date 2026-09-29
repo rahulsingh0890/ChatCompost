@@ -16,6 +16,12 @@ ChatCompost adds checkboxes to each conversation in your ChatGPT or Gemini sideb
 4. Click "Load unpacked"
 5. Select the folder containing this extension
 
+### After updating an existing installation
+
+1. Open `chrome://extensions/` and click the reload button on **ChatCompost**
+2. Refresh any open ChatGPT or Gemini tabs so they use the updated script
+3. Scroll to load older chats, then create a new chat and check that both receive checkboxes
+
 ## How to use
 
 1. Navigate to [chatgpt.com](https://chatgpt.com) or [gemini.google.com](https://gemini.google.com) and open your conversation sidebar
@@ -52,3 +58,9 @@ This extension only runs on ChatGPT and Gemini pages. It uses content scripts th
 
 Current version: 1.1.0
 
+## Development checks
+
+Run `npm ci` and `npm test` with Node.js 18 or newer. The tests simulate sidebar
+updates, replacement, new conversation URLs, and checkbox selection without
+contacting either service or deleting chats. The extension itself needs no build
+step or installed dependencies.

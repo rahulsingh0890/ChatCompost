@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ChatCompost checkbox appearance regression</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  /* Emulate a host page resetting native inputs after extension CSS loads. */
+  input[type="checkbox"] { appearance:none; border:0; background:transparent; padding:0; }
+  * { box-sizing:border-box; }
+  body { font:16px system-ui; margin:32px; }
+  main { display:flex; gap:24px; }
+  nav { width:280px; padding:12px; background:#fafafa; }
+  nav.dark { background:#202123; color:#eee; }
+  h2 { font-size:16px; }
+  a { display:flex; padding:12px; color:inherit; text-decoration:none; }
+  a[data-bulk-delete-checkbox] { --chatcompost-original-padding:12px; }
+  p { max-width:600px; }
+</style>
+<h1>Checkbox appearance regression</h1>
+<p>The host stylesheet removes native checkbox appearance, borders and backgrounds.
+Both unchecked and checked controls must remain visible. Tab to verify the focus ring.</p>
+<main>
+  <nav><h2>Light sidebar</h2>
+    <a href="/c/light-unchecked" data-bulk-delete-checkbox><input type="checkbox" class="bulk-delete-checkbox" aria-label="Light unchecked">Unchecked conversation</a>
+    <a href="/c/light-checked" data-bulk-delete-checkbox><input type="checkbox" class="bulk-delete-checkbox" aria-label="Light checked" checked>Selected conversation</a>
+  </nav>
+  <nav class="dark"><h2>Dark sidebar</h2>
+    <a href="/c/dark-unchecked" data-bulk-delete-checkbox><input type="checkbox" class="bulk-delete-checkbox" aria-label="Dark unchecked">Unchecked conversation</a>
+    <a href="/c/dark-checked" data-bulk-delete-checkbox><input type="checkbox" class="bulk-delete-checkbox" aria-label="Dark checked" checked>Selected conversation</a>
+  </nav>
+</main>
+<p id="result">Checking…</p>
+<script>
+  const boxes = [...document.querySelectorAll('input')];
+  for (const box of boxes) box.addEventListener('click', event => event.stopPropagation());
+  window.addEventListener('load', () => {
+    const passed = boxes.every(box => {
+      const style = getComputedStyle(box);
+      const rect = box.getBoundingClientRect();
+      return rect.width === 16 && rect.height === 16 && style.visibility === 'visible'
+        && style.opacity === '1' && parseFloat(style.borderTopWidth) > 0
+        && style.backgroundColor !== 'rgba(0, 0, 0, 0)'
+        && (!box.checked || style.backgroundImage.includes('data:image/svg+xml'));
+    });
+    document.querySelector('#result').textContent = passed
+      ? 'PASS: all four controls retain visible borders, backgrounds and checked indicators.'
+      : 'FAIL: host styles hide one or more checkbox states.';
+  });
+</script>

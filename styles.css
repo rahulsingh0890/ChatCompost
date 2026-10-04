@@ -1,10 +1,20 @@
 /* ChatCompost Styles - ChatGPT Bulk Deleter */
 
-/* Checkbox styling */
-.bulk-delete-checkbox {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
+/* Draw our own checkbox: page-wide input resets can hide native controls. */
+input[type="checkbox"].bulk-delete-checkbox {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  box-sizing: border-box !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  padding: 0 !important;
+  border: 1.5px solid #737373 !important;
+  border-radius: 3px !important;
+  background: #fff !important;
   margin-right: 8px;
   cursor: pointer;
   accent-color: #10a37f;
@@ -17,17 +27,30 @@
   transform: scale(1.1);
 }
 
-.bulk-delete-checkbox:checked {
-  accent-color: #10a37f;
+input[type="checkbox"].bulk-delete-checkbox:checked {
+  border-color: #087f63 !important;
+  background: #087f63 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px 14px no-repeat !important;
+}
+
+input[type="checkbox"].bulk-delete-checkbox:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+@media (forced-colors: active) {
+  input[type="checkbox"].bulk-delete-checkbox {
+    appearance: auto !important;
+    -webkit-appearance: auto !important;
+  }
 }
 
 /* Reserve a checkbox gutter without changing the app's pinned/recent layout. */
-nav a[href^="/c/"][data-bulk-delete-checkbox] {
+a[data-bulk-delete-checkbox] {
   position: relative;
   padding-inline-start: calc(var(--chatcompost-original-padding, 0px) + 24px) !important;
 }
 
-nav a[href^="/c/"][data-bulk-delete-checkbox] > .bulk-delete-checkbox {
+a[data-bulk-delete-checkbox] > .bulk-delete-checkbox {
   position: absolute;
   inset-inline-start: var(--chatcompost-original-padding, 0px);
   top: 50%;
@@ -35,7 +58,7 @@ nav a[href^="/c/"][data-bulk-delete-checkbox] > .bulk-delete-checkbox {
   transform: translateY(-50%);
 }
 
-nav a[href^="/c/"][data-bulk-delete-checkbox] > .bulk-delete-checkbox:hover {
+a[data-bulk-delete-checkbox] > .bulk-delete-checkbox:hover {
   transform: translateY(-50%) scale(1.1);
 }
 

@@ -166,3 +166,49 @@ test('preserves pinned row layout and does not accumulate padding on reinjection
   assert.equal(link.querySelector('.title').textContent, 'Ch 1 Visuals');
   assert.equal(link.querySelector('.project').textContent, 'Work');
 });
+
+test('adds checkboxes to project and absolute conversation URLs using canonical IDs', async (t) => {
+  const { document, window, tick } = await fixture(t, `<nav>
+    <a href="/g/g-p-project/c/project-chat?source=sidebar#latest">Project conversation</a>
+    <a href="https://chatgpt.com/c/absolute-chat?source=sidebar">Absolute conversation</a>
+    <a href="/g/g-p-project/project">Project folder</a>
+    <a href="/g/g-custom">Custom GPT home</a>
+    <a href="https://example.com/c/external">External link</a>
+    <a href="/c/">Empty conversation</a>
+  </nav><main><a href="/c/article-link">Conversation link in a message</a></main>`);
+  assert.equal(document.querySelectorAll('.bulk-delete-checkbox').length, 2);
+  const project = document.querySelector('a');
+  project.querySelector('input').click();
+  assert.deepEqual(JSON.parse(window.sessionStorage.getItem('chatcompost_chatgpt_checked')), ['project-chat']);
+  project.setAttribute('href', '/c/project-chat');
+  await tick(151);
+  assert.equal(project.querySelector('input').checked, true);
+  project.setAttribute('href', '/g/g-p-project/project');
+  await tick(151);
+  assert.equal(project.querySelector('input'), null);
+  assert.equal(project.hasAttribute('data-bulk-delete-checkbox'), false);
+});
+
+test('handles lazy-loaded project conversations in a navigation role', async (t) => {
+  const { document, tick } = await fixture(t, '<div role="navigation"></div>');
+  document.querySelector('[role="navigation"]').innerHTML = '<a href="/g/g-custom/c/late-chat">Later chat</a>';
+  await tick(151);
+  assert.equal(document.querySelectorAll('.bulk-delete-checkbox').length, 1);
+});
+
+test('project deletion sends only the conversation ID to the mocked API', async (t) => {
+  const { document, window } = await fixture(t, '<nav><a href="/g/g-p-project/c/delete-id?source=sidebar">Project chat</a></nav>');
+  const calls = [];
+  window.confirm = () => true;
+  window.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, json: async () => url.endsWith('/session') ? { accessToken: 'fake-test-token' } : { success: true } };
+  };
+  document.querySelector('input').click();
+  document.querySelector('#bulk-delete-btn').click();
+  for (let i = 0; i < 12; i++) await Promise.resolve();
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].url, 'https://chatgpt.com/backend-api/conversation/delete-id');
+  assert.equal(calls[1].options.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[1].options.body), { is_visible: false });
+});

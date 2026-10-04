@@ -5,11 +5,19 @@
   if (host !== 'chatgpt.com' && host !== 'chat.openai.com') return;
 
   const config = {
-    chatItemSelector: 'nav a[href^="/c/"]',
+    chatItemSelector: ':is(nav, [role="navigation"]) a[href]',
     storageKey: 'chatcompost_chatgpt_checked',
     extractId: (el) => {
-      const href = el.getAttribute('href');
-      return href && href.startsWith('/c/') ? href.substring(3) : null;
+      try {
+        const url = new URL(el.getAttribute('href'), window.location.href);
+        if (url.origin !== window.location.origin) return null;
+        // Project/custom-GPT conversations use /g/<slug>/c/<id>.
+        // Parse the path so query strings never become part of a deletion ID.
+        const match = url.pathname.match(/^\/(?:g\/[^/]+\/)?c\/([a-zA-Z0-9_-]+)\/?$/);
+        return match ? match[1] : null;
+      } catch {
+        return null;
+      }
     }
   };
 
@@ -73,12 +81,7 @@
 
   // Get a unique identifier for a chat link (for state persistence)
   function getChatIdentifier(chatLink) {
-    const id = config.extractId(chatLink);
-    if (id) return id;
-
-    // Fallback to href or text content
-    const href = chatLink.getAttribute('href');
-    return href || chatLink.textContent.trim().substring(0, 50);
+    return config.extractId(chatLink);
   }
 
   // Save checked state to sessionStorage
@@ -150,7 +153,17 @@
 
   // Find all chat conversation links in the sidebar.
   function findChatItems() {
-    return document.querySelectorAll(config.chatItemSelector);
+    // React can reuse a conversation row for a project or another navigation
+    // entry. Remove stale controls before collecting valid conversation links.
+    document.querySelectorAll('a[data-bulk-delete-checkbox]').forEach((link) => {
+      if (!link.matches(config.chatItemSelector) || !getConversationId(link)) {
+        link.querySelector('.bulk-delete-checkbox')?.remove();
+        link.removeAttribute('data-bulk-delete-checkbox');
+        link.style.removeProperty('--chatcompost-original-padding');
+      }
+    });
+    return Array.from(document.querySelectorAll(config.chatItemSelector))
+      .filter(link => getConversationId(link));
   }
 
   // Create and inject a checkbox for a chat item.
@@ -175,6 +188,7 @@
       checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'bulk-delete-checkbox';
+      checkbox.setAttribute('aria-label', 'Select conversation for deletion');
 
       // Set checked state BEFORE adding event listeners
       checkbox.checked = shouldBeChecked;
